@@ -1,0 +1,5 @@
+
+SUB handle_objects (src AS SOURCE_copy)
+
+END SUB
+

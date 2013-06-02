@@ -1,0 +1,10 @@
+
+SUB init_source (src AS SOURCE_copy)
+
+END SUB
+
+SUB load_source (source AS MEM_Array, src AS SOURCE_copy)
+
+END SUB
+
+

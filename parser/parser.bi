@@ -1,0 +1,92 @@
+
+CONST BYTE_TYPE = 1
+CONST INTEGER_TYPE = 2
+CONST LONG_TYPE = 3
+CONST SINGLE_TYPE = 4
+CONST DOUBLE_TYPE = 5
+CONST INTEGER64_TYPE = 6
+CONST STRING_TYPE = 8
+CONST OFFSET_TYPE = 9
+CONST FLOAT_TYPE = 10
+
+CONST MAKE_TYPE   = &H0000000007F
+CONST IS_UNSIGNED = &H00000000080 
+CONST IS_UDT      = &H000000FFF00
+CONST MAKE_UDT    = &H00000000100
+CONST STRING_SIZE = &HFFFFFF00000
+CONST MAKE_STRING = &H00000100000
+
+DIM SHARED SIZEOF_SOURCE_LINE 
+DIM SHARED SIZEOF_CONST_TYPE, SIZEOF_MAIN_TYPE_NODE, SIZEOF_SUB_TYPE_NODE
+DIM SHARED SIZEOF_SUB_FUNC, SIZEOF_OBJECT, SIZEOF_TRAIT, SIZEOF_DECLARE_LIBRARY
+DIM SHARED SIZEOF_SOURCE_COPY
+
+SIZEOF_SOURCE_LINE = MEM_SIZEOF_MEM_STRING
+TYPE source_line
+  l AS MEM_String
+END TYPE
+
+SIZEOF_CONST_TYPE = MEM_SIZEOF_MEM_STRING * 2
+TYPE const_type
+  nam   AS MEM_String
+  value AS MEM_String
+END TYPE
+
+SIZEOF_MAIN_TYPE_NODE = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_OFFSET + 4 + 4
+TYPE main_type_node
+  type_nam        AS MEM_String
+  first_type_node AS _OFFSET
+  members         AS LONG
+  full_size       AS LONG
+END TYPE
+
+SIZEOF_SUB_TYPE_NODE = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_OFFSET + 4 + 4
+TYPE sub_type_node
+  member_nam     AS MEM_String
+  next_node      AS _OFFSET
+  size           AS LONG
+  size_to_member AS LONG
+END TYPE
+
+SIZEOF_SUB_FUNC = 4 + MEM_SIZEOF_MEM_STRING + 4 + MEM_SIZEOF_MEM_STRING
+TYPE SUB_FUNC
+  subfunc AS LONG
+  nam     AS MEM_String
+  typ     AS LONG
+  source  AS MEM_String
+END TYPE
+
+SIZEOF_OBJECT = MEM_SIZEOF_MEM_STRING + 4 + MEM_SIZEOF_MEM_ARRAY + 4 + MEM_SIZEOF_MEM_ARRAY * 3
+TYPE OBJECT
+  nam      AS MEM_String
+  abstract AS LONG
+  traits   AS MEM_Array
+  inherit  AS LONG
+  flags    AS MEM_Array
+  public   AS MEM_Array
+  private  AS MEM_Array
+END TYPE
+
+SIZEOF_TRAIT = MEM_SIZEOF_MEM_STRING 
+TYPE trait
+  nam as MEM_String
+END TYPE
+
+SIZEOF_DECLARE_LIBRARY = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_MEM_ARRAY
+TYPE declare_library
+  lib       AS MEM_String
+  sub_funcs AS MEM_Array
+END TYPE
+
+SIZEOF_SOURCE_COPY = MEM_SIZEOF_MEM_ARRAY * 8
+TYPE SOURCE_copy
+  consts      AS MEM_Array 'Array of const_type
+  main_source AS MEM_Array 'Array of source_line
+  types       AS MEM_Array 'Array of main_type_node
+  SUB_func    AS MEM_Array 'Array of SUB_FUNC
+  Objects     AS MEM_Array 'Array of OBJECT
+  Traits      AS MEM_Array 'Array of TRAIT
+  libs        AS MEM_Array 'Array of declare_library
+  header      AS MEM_Array 'Array of MEM_Strings
+END TYPE
+
