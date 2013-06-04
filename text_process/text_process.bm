@@ -3,6 +3,8 @@
 'This SUB also handles '$INCLUDE:'ing any files
 'When pre-processing is done, the complete processed raw source code
 'is contained inside of 'src'
+
+'NOTE: every SUB and FUNCTION  starts
 SUB pre_process (file$, src AS MEM_Array)
 
   STATIC include_once_files AS MEM_Array
@@ -170,7 +172,7 @@ END SUB
 
 FUNCTION get_token$(n$)
   alphanumeric$ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
-  numeric$ = "1234567890"
+  numeric$ = "1234567890."
   split$ = "(),:;"
   n$ = ltrim$(n$)
   f$ = left$(n$, 1)
@@ -204,6 +206,84 @@ FUNCTION evaluate_expression& (defines AS MEM_Array, expression$)
   e$ = expression$
   
 END FUNCTION
+
+FUNCTION get_rpn_notation$ (define_list as MEM_Array, expression$)
+  opp_stack$ = ""
+  eval_stack$ = ""
+  e$ = expression$
+  do while e$ > ""
+    t$ = get_token$(e$)
+
+    found_flag = 0
+    num = 0
+    select case ucase$(t$)
+      CASE "+","*","^","/","NOT","DEFINED","AND","OR","XOR"
+        found_flag = -1
+
+      case "-" ' Could be minus or negation
+        found_flag = -1
+
+      case "("
+        found_flag = -1
+        stack_push oop_stack$, "("
+
+      case ")"
+        found_flag = -1
+
+    end select
+    
+    if found_flag = 0
+      if (left$(t$, 1) >= "0" and left$(t$, 1) <= "9") or left$(t$, 1) = "." or left$(t$, 1) = "&" then
+        v$ = VAL(t$)
+        stack_push eval_stack$, v$
+      elseif define_exists(define_list, t$) then
+        v$ = get_define_value_from_array$(define_list, t$)
+      end if
+    end if
+  loop
+end function
+
+sub stack_push (stack$, t$)
+  stack$ = t$ + chr$(0) + stack$
+end sub 
+
+function stack_pop$ (stack$) 
+  stack_pop$ = mid$(stack$, 1, instr(stack$, chr$(0)) - 1)
+  stack$ = mid$(stack$, instr(stack$, chr$(0)) + 1)
+end function
+
+function get_precedence& (n$)
+  select case ucase$(n$)
+    case "DEFINED"
+      get_precedence& = 12
+    case "^"
+      get_precedence& = 11
+    case "*", "\", "/"
+      get_precedence& = 10
+    case "MOD"
+      get_precedence& = 9
+    case "+", "-"
+      get_precedence& = 8
+    case "=","<>",">",">",">=","<="
+      get_precedence& = 7
+    case "NOT"
+      get_precedence& = 6
+    case "AND"
+      get_precedence& = 5
+    CASE "OR"
+      get_precedence& = 4
+    CASE "XOR"
+      get_precedence& = 3
+    CASE "EQV"
+      get_precedence& = 2
+    CASE "IMP"
+      get_precedence& = 1
+  end select
+end function
+
+function get_associativity (o$)
+
+end function
 
 SUB report_preprocessor_error (e$)
 
@@ -242,6 +322,18 @@ $CHECKING:OFF
 _MEMPUT MEM_FAKEMEM, a.mem + a.last_element * a.element_size, d
 $CHECKING:ON
 END SUB
+
+function define_exists (a as MEM_Array, de$)
+$CHECKING:OFF
+DIM d as define
+for x = 1 to a.last_element
+  d = _memget(mem_fakemem, a.mem + x * a.element_size, define)
+    define_exists = -1
+    exit function
+  end if
+next x
+$CHECKING:ON
+end function
 
 FUNCTION change_define_in_array (a as MEM_Array, old$, new$)
 $CHECKING:OFF
