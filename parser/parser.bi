@@ -72,7 +72,7 @@ TYPE trait
   nam as MEM_String
 END TYPE
 
-SIZEOF_DECLARE_LIBRARY = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_MEM_ARRAY
+SIZEOF_DECLARE_LIBRARY = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_ME:wM_ARRAY
 TYPE declare_library
   lib       AS MEM_String
   sub_funcs AS MEM_Array
@@ -89,4 +89,14 @@ TYPE SOURCE_copy
   libs        AS MEM_Array 'Array of declare_library
   header      AS MEM_Array 'Array of MEM_Strings
 END TYPE
+
+TYPE statement
+
+END TYPE
+
+TYPE statement_node
+  statement_type AS LONG
+  leafs as _OFFSET
+END TYPE
+
 

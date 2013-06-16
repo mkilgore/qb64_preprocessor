@@ -729,7 +729,7 @@ DIM fnum AS LONG
 fnum = FREEFILE
 'print "F="; fnum
 
-'PRINT "File:"; file$
+PRINT "File:"; file$
 OPEN file$ FOR INPUT AS #fnum
 
 process_line = -1
@@ -890,6 +890,31 @@ CLOSE #fnum
 'PRINT "Closed file!"
 'PRINT "Closed file!"
 END SUB
+
+FUNCTION get_type_size& (t&)
+typ& = t& AND MAKE_TYPE
+if typ& = BYTE_TYPE THEN
+  get_type_size& = 1
+elseif typ& = INTEGER_TYPE then
+  get_type_size& = 2
+elseif typ& = LONG_TYPE OR typ& = SINGLE_TYPE then
+  get_type_size& = 4
+elseif typ& = INTEGER64_TYPE OR typ& = DOUBLE_TYPE then
+  get_type_size& = 8
+elseif typ& = OFFSET_TYPE then
+  if instr(_OS$, "[32BIT]") then
+    get_type_size& = 4
+  else
+    get_type_size& = 8
+  end if
+elseif typ& = FLOAT_TYPE then
+  get_type_size& = 32
+elseif typ& = STRING_TYPE then
+  get_type_size& = (t& AND STRING_SIZE) \ MAKE_STRING
+elseif t& AND IS_UDT then
+  get_Type_size& = udt_xsize((t& AND IS_UDT) \ MAKE_STRING)
+end if
+END FUNCTION
 
 FUNCTION strip_quote$(s$)
 s2$ = rtrim$(ltrim$(s$))

@@ -1,39 +1,83 @@
 
-'This SUB handles pre-processing the file ("!!" statements)
+
+'$include:'commands/define_cmd.bm'
+'$include:'commands/if_cmd.bm'
+'$include:'commands/include_cmd.bm'
+
+'$include:'eval/eval.bm'
+
+'This SUB handles pre-processing the file ("!!" statements/
 'This SUB also handles '$INCLUDE:'ing any files
 'When pre-processing is done, the complete processed raw source code
 'is contained inside of 'src'
 
-'NOTE: every SUB and FUNCTION  starts
-SUB pre_process (file$, src AS MEM_Array)
+sub pre_process (file$, src AS MEM_Array)
 
-  STATIC include_once_files AS MEM_Array
-  STATIC define_list        AS MEM_Array
-  STATIC macro_list         AS MEM_Array
+  pre_process_first_pass file$, src
+
+  
+  'debug_output "Include once files:"
+  'for x = 1 to pre_include_once_files.last_element
+  '  debug_output MEM_get_str_array$(pre_include_once_files, x)
+  'next x
+  DIM d as pre_define
+  'debug_output "Defines:" + str$(pre_define_list.last_element)
+  for x = 1 to pre_define_list.last_element
+    $CHECKING:OFF
+    d = _MEMGET(MEM_FAKEMEM, pre_define_list.mem + x * define_list.element_size, pre_define)
+    $CHECKING:ON
+    'if MEM_get_Str$(d.nam) > "" then
+    '  debug_output "Define : " + MEM_get_str$(d.nam) + " : " + MEM_get_str$(d.value)
+    'end if
+  next x
+  'debug_output "Defines:" + str$(pre_define_list.last_element)
+  MEM_free_string_array pre_include_once_files
+  pre_free_define_array pre_define_list
+  pre_free_macro_array pre_macro_list
+
+end sub
+
+sub pre_register_cmd_options ()
+  dim a as arg_argtype
+  MEM_put_str a.lng, "pre-process": a.short = "p"
+  pre_run_preprocessor = arg_reg(a): arg_clear a
+  MEM_put_str a.lng, "no-pre-process": a.short = ""
+  pre_dont_run = arg_Reg(a): arg_clear a
+  MEM_put_str a.lng, "skip-include"
+  pre_skip_include = arg_reg(a)
+
+end sub
+
+'NOTE: every SUB and FUNCTION  starts
+SUB pre_process_first_pass (file$, src AS MEM_Array)
 
   DIM process_next_line AS LONG
-
 
   current_CD$ = get_cwd$
   'debug_output "Current DIR:" + current_CD$
   'Get a new file number and open our file
   DIM fnum AS LONG
   fnum = FREEFILE
-  debug_output "Loading file: " + file$
+  'debug_output "Loading file: " + file$
 
   
   error_hand = 0
   OPEN file$ FOR INPUT AS #fnum
   if error_hand <> 0 then
    if pre_recurse > 0 then
-     report_preprocessor_error "Unable to open included file: " + file$
+     pre_report_preprocessor_error "Unable to open included file: " + file$
    else
-     report_preprocessor_error "Unable to open file: " + file$
+     pre_report_preprocessor_error "Unable to open file: " + file$
    end if
   end if
 
   PRE_FILE$ = current_CD$ + file$
   PRE_LINE = 0
+
+  process_next_line = -1
+  if_count = 0
+  current_if = 0
+  skip_next_if = 0
 
   DO WHILE NOT EOF(fnum)
     LINE INPUT #fnum, l$
@@ -45,68 +89,45 @@ SUB pre_process (file$, src AS MEM_Array)
    
     if left$(l$, 2) = "!!" then 'Pre-Processor command
       cmd$ = mid$(l$, 3)
-      first_token$ = get_token$(cmd$)
+      first_token$ = pre_get_token$(cmd$)
       ufirst_token$ = ucase$(first_token$)
-      if ufirst_token$ = "INCLUDE" then
-        gosub include      
 
-      elseif ufirst_token$ = "DEFINE" then
-        gosub define
-
-      elseif ufirst_token$ = "UNDEFINE" then
-        gosub undefine
-
-      elseif ufirst_Token$ = "IF" then
+      if ufirst_token$ = "IF" then
         gosub proc_if
-        
-      elseif ufirst_Token$ = "ELSEIF" then
-        gosub proc_if
-
       elseif ufirst_token$ = "END" then
         gosub proc_end
-
-      else
-        report_preprocessor_error "Unreconized pre-processor command: " + first_token$
+      elseif ufirst_token$ = "ELSEIF" then
+        gosub proc_elseif
+      elseif ufirst_token$ = "ELSE" then
+        gosub proc_else
+      elseif process_next_line then
+        if ufirst_token$ = "INCLUDE" then
+          gosub include      
+        elseif ufirst_token$ = "DEFINE" then
+          gosub define
+        elseif ufirst_token$ = "UNDEFINE" then
+          gosub undefine
+        else
+          pre_report_preprocessor_error "Unreconized pre-processor command: " + first_token$
+        end if
       end if
-
       add_line = 0
     end if
 
-    if add_line then MEM_add_string_to_array src, l$
+    if add_line and process_next_line then MEM_add_string_to_array src, l$
   LOOP
 
   CLOSE #fnum
-
-  if PRE_recurse = 0 then
-    debug_output "Include once files:"
-    for x = 1 to include_once_files.last_element
-      debug_output MEM_get_str_array$(include_once_files, x)
-    next x
-    DIM d as define
-    debug_output "Defines:" + str$(define_list.last_element)
-    for x = 1 to define_list.last_element
-      $CHECKING:OFF
-      d = _MEMGET(MEM_FAKEMEM, define_list.mem + x * define_list.element_size, define)
-      $CHECKING:ON
-      if MEM_get_Str$(d.nam) > "" then
-        debug_output "Define : " + MEM_get_str$(d.nam) + " : " + MEM_get_str$(d.value)
-      end if
-    next x
-    'debug_output "Defines:" + str$(define_list.last_element)
-    MEM_free_string_array include_once_files
-    free_define_array define_list
-    free_macro_array macro_list
-  end if
 
   EXIT SUB
 
 
 ' GUSUB's to handle each command
 include:
-  next_token$ = get_token$(cmd$)
+  next_token$ = pre_get_token$(cmd$)
   unext_token$ = ucase$(next_token$)
   if unext_token$ = "ONCE" then
-    MEM_add_string_to_array include_once_files, current_CD$ + file$
+    MEM_add_string_to_array pre_include_once_files, current_CD$ + file$
   elseif left$(unext_token$, 1) = chr$(34) then
     next_file$ = mid$(next_token$, instr(next_token$, chr$(34)) + 1)
     next_file$ = mid$(next_file$, 1, instr(next_file$, chr$(34)) - 1)
@@ -125,14 +146,15 @@ include:
       new_cd$ = UCASE$(new_cd$)
       next_filename$ = ucase$(next_filename$)
     end if
-    debug_output "include file: " + new_cd$ + next_filename$
-    if string_not_in_array(new_cd$ + next_filename$, include_once_files) then
+    new_cd$ = simplify_directory$(new_cd$)
+    if string_not_in_array(new_cd$ + next_filename$, pre_include_once_files) then
+      'debug_output "include file: " + new_cd$ + next_filename$
       ' debug_output "Switching DIR: " + new_cd$
       CHDIR new_cd$
       pre_recurse = pre_recurse + 1
       file_sav$ = PRE_FILE$
       line_sav = PRE_LINE
-      pre_process next_filename$, src
+      pre_process_first_pass next_filename$, src
       PRE_FILE$ = file_sav$
       PRE_LINE = line_sav
       PRE_recurse = pre_recurse - 1
@@ -140,40 +162,79 @@ include:
       CHDIR current_CD$
     end if
   else
-    report_preprocessor_error "Include statement needs 'ONCE' or quoted filename"
+    pre_report_preprocessor_error "Include statement needs 'ONCE' or quoted filename"
   end if
 return
 
 define:
-  def_name$ = get_token$(cmd$)
+  def_name$ = pre_get_token$(cmd$)
   value$ = cmd$
-  debug_output "Adding define: " + def_name$ + " : " + value$
-  new_define define_list, def_name$, value$
+  'debug_output "Adding define: " + def_name$ + " : " + value$
+  pre_new_define pre_define_list, def_name$, value$
 return
 
 undefine:
-  def_name$ = get_token$(cmd$)
-  remove_define_from_array define_list, def_name$
+  def_name$ = pre_get_token$(cmd$)
+  pre_remove_define_from_array pre_define_list, def_name$
 return
 
 proc_if:
+  if_count = if_count + 1
+  if current_if < if_count then
+    current_if = if_count
+    cmdr$ = rtrim$(cmd$)
+    lcmd$ = ucase$(right$(cmd$, 4))
+    rcmd$ = left$(cmdr$, len(cmdr$) - 1)
+    if lcmd$ <> "THEN" then pre_report_preprocessor_error "Expected THEN at end of IF statement"
+    v$ = pre_evaluate_expression$ (cmdr$)
+    if val(v$) then
+      process_next_line = -1
+      skip_next_if = -1
+    else
+      process_next_line = 0
+      skip_next_if = 0
+    end if
+  end if
+return
 
+proc_elseif:
+  cmdr$ = rtrim$(cmd$)
+  lcmd$ = ucase$(right$(cmd$, 4))
+  rcmd$ = left$(cmdr$, len(cmdr$) - 1)
+  if lcmd$ <> "THEN" then pre_report_preprocessor_error "Expected THEN at end of ELSEIF statement"
+  v$ = pre_evaluate_expression$ (cmdr$)
+  if val(v$) and skip_next_if = 0 then
+    process_next_line = -1
+    skip_next_if = -1
+  else
+    process_next_line = 0
+  end if
+return 
+
+proc_else:
+  if skip_next_if = 0 then
+    process_next_line = -1
+  else
+    process_next_line = 0
+  end if
 return
 
 proc_end:
-  next_token$ = get_token$(cmd$)
+  next_token$ = pre_get_token$(cmd$)
   unext_token$ = ucase$(next_token$)
   IF unext_token$ = "IF" then
-    endif = 0
+    if_count = if_count - 1
+    skip_next_if = -1
+    process_next_line = -1
   end if
 return
 
 END SUB
 
-FUNCTION get_token$(n$)
+FUNCTION pre_get_token$(n$)
   alphanumeric$ = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
   numeric$ = "1234567890."
-  split$ = "(),:;"
+  split$ = "(),:;+/\*^=-"
   n$ = ltrim$(n$)
   f$ = left$(n$, 1)
   if instr(alphanumeric$, f$) then
@@ -193,99 +254,26 @@ FUNCTION get_token$(n$)
     tok$ = mid$(n$, 1, count - 1)
   elseif instr(split$, f$) then
     tok$ = f$ 
+  elseif f$ = "<" or f$ = ">" then
+    f2$ = mid$(n$, 2, 1)
+    if f2$ = "=" then
+      tok$ = f$ + f2$
+    elseif (f$ = "<" and f2$ = ">") then
+      tok$ = f$ + f2$
+    else
+      tok$ = f$
+    end if
   elseif f$ = chr$(34) then
     tok$ = mid$(n$, 1, instr(mid$(n$, 2), chr$(34)) + 2)
-    if instr(mid$(n$, 2), CHR$(34)) <= 0 then report_preprocessor_error "Missing matching Quote character"
+    if instr(mid$(n$, 2), CHR$(34)) <= 0 then debug_output "Missing matching Quote character":exit function
   end if
   n$ = mid$(n$, len(tok$) + 1)
-  get_token$ = tok$
+  pre_get_token$ = tok$
   ' debug_output "Token: " + tok$
 END FUNCTION
 
-FUNCTION evaluate_expression& (defines AS MEM_Array, expression$)
-  e$ = expression$
-  
-END FUNCTION
 
-FUNCTION get_rpn_notation$ (define_list as MEM_Array, expression$)
-  opp_stack$ = ""
-  eval_stack$ = ""
-  e$ = expression$
-  do while e$ > ""
-    t$ = get_token$(e$)
-
-    found_flag = 0
-    num = 0
-    select case ucase$(t$)
-      CASE "+","*","^","/","NOT","DEFINED","AND","OR","XOR"
-        found_flag = -1
-
-      case "-" ' Could be minus or negation
-        found_flag = -1
-
-      case "("
-        found_flag = -1
-        stack_push oop_stack$, "("
-
-      case ")"
-        found_flag = -1
-
-    end select
-    
-    if found_flag = 0
-      if (left$(t$, 1) >= "0" and left$(t$, 1) <= "9") or left$(t$, 1) = "." or left$(t$, 1) = "&" then
-        v$ = VAL(t$)
-        stack_push eval_stack$, v$
-      elseif define_exists(define_list, t$) then
-        v$ = get_define_value_from_array$(define_list, t$)
-      end if
-    end if
-  loop
-end function
-
-sub stack_push (stack$, t$)
-  stack$ = t$ + chr$(0) + stack$
-end sub 
-
-function stack_pop$ (stack$) 
-  stack_pop$ = mid$(stack$, 1, instr(stack$, chr$(0)) - 1)
-  stack$ = mid$(stack$, instr(stack$, chr$(0)) + 1)
-end function
-
-function get_precedence& (n$)
-  select case ucase$(n$)
-    case "DEFINED"
-      get_precedence& = 12
-    case "^"
-      get_precedence& = 11
-    case "*", "\", "/"
-      get_precedence& = 10
-    case "MOD"
-      get_precedence& = 9
-    case "+", "-"
-      get_precedence& = 8
-    case "=","<>",">",">",">=","<="
-      get_precedence& = 7
-    case "NOT"
-      get_precedence& = 6
-    case "AND"
-      get_precedence& = 5
-    CASE "OR"
-      get_precedence& = 4
-    CASE "XOR"
-      get_precedence& = 3
-    CASE "EQV"
-      get_precedence& = 2
-    CASE "IMP"
-      get_precedence& = 1
-  end select
-end function
-
-function get_associativity (o$)
-
-end function
-
-SUB report_preprocessor_error (e$)
+SUB pre_report_preprocessor_error (e$)
 
 _DEST _CONSOLE
 if pre_recurse > 0 then PRINT "In Included file: " + PRE_FILE$; ": Line"; PRE_LINE
@@ -294,7 +282,7 @@ SYSTEM
 
 END SUB
 
-SUB report_preprocessor_warning (e$)
+SUB pre_report_preprocessor_warning (e$)
 d& = _dest
 _DEST _CONSOLE
 if pre_recurse > 0 then PRINT "In Included file: " + PRE_FILE$; ": Line:"; PRE_LINE
@@ -302,109 +290,24 @@ PRINT "Warning: "; e$
 _dest d&
 END SUB
 
-' Define Array
 
-SUB new_define (a as MEM_Array, d$, v$)
-$CHECKING:OFF
-if change_define_in_array(a, d$, v$) = 0 then
-  add_define_to_array a, d$, v$
-end if
-$CHECKING:ON
-END SUB
-
-SUB add_define_to_array (a as MEM_Array, s$, v$)
-DIM d as define
-if a.length = 0 then a.element_size = SIZEOF_DEFINE
-MEM_increment_array a
-MEM_put_str d.nam, s$
-MEM_put_str d.value, v$
-$CHECKING:OFF
-_MEMPUT MEM_FAKEMEM, a.mem + a.last_element * a.element_size, d
-$CHECKING:ON
-END SUB
-
-function define_exists (a as MEM_Array, de$)
-$CHECKING:OFF
-DIM d as define
-for x = 1 to a.last_element
-  d = _memget(mem_fakemem, a.mem + x * a.element_size, define)
-    define_exists = -1
-    exit function
-  end if
-next x
-$CHECKING:ON
-end function
-
-FUNCTION change_define_in_array (a as MEM_Array, old$, new$)
-$CHECKING:OFF
-DIM d as define
-FOR x = 1 to a.last_element
-  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, define)
-  if MEM_get_Str$(d.nam) = old$ then
-    MEM_put_str d.value, new$
-    _MEMPUT MEM_FAKEMEM, a.mem + x * a.element_Size, d
-    change_define_in_array = -1
-    exit sub
-  end if
-NEXT x
-$CHECKING:ON
-END FUNCTION 
-
-SUB remove_define_from_array (a as MEM_Array, d$)
-$CHECKING:OFF
-DIM d as define
-FOR x = 1 to a.last_element
-  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, define)
-  if MEM_get_Str$(d.nam) = d$ then
-    MEM_put_str d.nam, ""
-    _MEMPUT MEM_FAKEMEM, a.mem + x * a.element_Size, d
-    exit sub
-  end if
-NEXT x
-$CHECKING:ON
-END SUB
-
-FUNCTION get_define_value_from_array$ (a as MEM_Array, d$)
-$CHECKING:OFF
-DIM d as define
-FOR x = 1 to a.last_element
-  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, define)
-  if MEM_get_Str$(d.nam) = d$ then
-    get_define_value_from_array$ = MEM_get_Str$(d.value)
-    exit sub
-  end if
-NEXT x
-$CHECKING:ON
-END FUNCTION
-
-SUB free_define_array (a as MEM_Array)
-DIM d as define
-FOR x = 1 to a.last_element
-  $CHECKING:OFF
-  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, define)
-  MEM_free_string d.nam
-  MEM_free_string d.value
-  $CHECKING:ON
-NEXT x
-MEM_free_array a
-END SUB
 
 ' Macro Array
 
-SUB add_macro_to_array (a AS MEM_Array, mnew AS macro)
-DIM m as macro
-if a.length = 0 then a.element_Size = SIZEOF_MACRO
+SUB pre_add_macro_to_array (a AS MEM_Array, mnew AS pre_macro)
+DIM m as pre_macro
+if a.length = 0 then a.element_Size = SIZEOF_pre_MACRO
 MEM_increment_array a
 MEM_put_str m.fnam, MEM_get_Str$(mnew.fnam)
 'MEM
 
 END SUB
 
-SUB free_macro_array (a as MEM_Array)
-DIM m as macro
+SUB pre_free_macro_array (a as MEM_Array)
+DIM m as pre_macro
 FOR x = 1 to a.last_element
   $CHECKING:OFF
-  m = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, macro)
+  m = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, pre_macro)
   MEM_free_string m.fnam
   MEM_free_string_array m.lines
   $CHECKING:ON

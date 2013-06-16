@@ -1,0 +1,34 @@
+
+function arg_reg& (a as arg_argtype)
+  arg_nextreg = arg_nextreg + 1
+  if ubound(arg_list) <= arg_nextreg then
+    REDIM _PRESERVE arg_list(ubound(arg_list) + 100) AS arg_argtype
+  end if
+  MEM_put_str arg_list(arg_nextarg).lng, MEM_get_str$(a.lng)
+  arg_list(arg_nextarg).short = a.short
+  arg_list(arg_nextarg).param_type = a.param_type
+end function
+
+'Doesn't free the 'lng' -- The string's contents
+'Are copied when we register an arg anyway
+'param_value is assumed to be blank -- Since it should be
+sub arg_clear (a as arg_argtype)
+  a.short = space$(len(a.short))
+  a.param_type = 0
+end sub
+
+'Add in all functions to call...
+sub arg_register_arguments ()
+  dim a as arg_argtype
+  pre_register_cmd_options
+end sub
+
+sub arg_parse_arguments (cmd$)
+  c$ = ltrim$(rtrim$(cmd$))
+  SOURCE_FILE$ = get_file$(mid$(c$, 1, instr(c$, " ") - 1))
+  SOURCE_DIRECTORY$ = get_dir$(mid$(c$, 1, instr(c$, " ") - 1))
+  
+  OUTPUT_FILE$ = get_file$(mid$(c$, instr(c$, " ") + 1))
+  OUTPUT_DIRECTORY$ = get_dir$(mid$(c$, instr(c$, " ") - 1))
+end sub
+
