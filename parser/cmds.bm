@@ -1,0 +1,31 @@
+dim s as parse_statement_entry
+
+s.node_size = LEN(parse_statement_base, TYPE)
+s.cmd_type  = PARSE_FUNC
+MEM_put_str s.ident,  "ABS"
+MEM_put_str s.params, MKL$(NUMERAL_TYPE)
+MEM_put_str s.format, "?"
+parse_reg_command s: parse_clear_command s
+
+s.node_size = LEN(parse_statement_base, TYPE)
+s.cmd_type  = parse_func
+MEM_put_str s.ident, "ASC"
+MEM_put_str s.params, MKL$(STRING_TYPE) + MKL$(NUMERAL_TYPE)
+MEM_put_str s.format, "?[,?]"
+parse_reg_command s: parse_clear_command s
+
+s.node_size = LEN(parse_statement_base, TYPE)
+s.cmd_type  = parse_func
+MEM_put_str s.ident, "ATN"
+MEM_put_str s.params, MKL$(NUMERAL_TYPE)
+MEM_put_str s.format, "?"
+parse_reg_command s: parse_clear_command s
+
+s.node_size = LEN(parse_statement_base, TYPE)
+s.cmd_type  = parse_func
+MEM_put_str s.ident, "BEEP"
+MEM_put_str s.params, ""
+MEM_put_str s.format, ""
+parse_reg_command s: parse_clear_command s
+
+s.node_size = LEN(parse_statement_base, TYPE)

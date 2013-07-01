@@ -1,102 +1,50 @@
 
-CONST BYTE_TYPE = 1
-CONST INTEGER_TYPE = 2
-CONST LONG_TYPE = 3
-CONST SINGLE_TYPE = 4
-CONST DOUBLE_TYPE = 5
-CONST INTEGER64_TYPE = 6
-CONST STRING_TYPE = 8
-CONST OFFSET_TYPE = 9
-CONST FLOAT_TYPE = 10
+DIM SHARED BYTE_TYPE AS _UNSIGNED LONG, INTEGER_TYPE AS _UNSIGNED LONG, LONG_TYPE AS _UNSIGNED LONG, SINGLE_TYPE AS _UNSIGNED LONG, DOUBLE_TYPE AS _UNSIGNED LONG, INTEGER64_TYPE AS _UNSIGNED LONG, STRING_TYPE AS _UNSIGNED LONG, OFFSET_TYPE AS _UNSIGNED LONG, FLOAT_TYPE AS _UNSIGNED LONG, SPECIAL_TYPE AS _UNSIGNED LONG, ARRAY_TYPE AS _UNSIGNED LONG 
 
-CONST MAKE_TYPE   = &H0000000007F
-CONST IS_UNSIGNED = &H00000000080 
-CONST IS_UDT      = &H000000FFF00
-CONST MAKE_UDT    = &H00000000100
-CONST STRING_SIZE = &HFFFFFF00000
-CONST MAKE_STRING = &H00000100000
+BYTE_TYPE      = &H0001
+INTEGER_TYPE   = &H0002
+LONG_TYPE      = &H0004
+SINGLE_TYPE    = &H0008
+DOUBLE_TYPE    = &H0010
+INTEGER64_TYPE = &H0020
+STRING_TYPE    = &H0040
+OFFSET_TYPE    = &H0080
+FLOAT_TYPE     = &H0100
+TYPE_NAME_TYPE = &H0200
+SPECIAL_TYPE   = &H0400
+UDT_TYPE       = &H0800
 
-DIM SHARED SIZEOF_SOURCE_LINE 
-DIM SHARED SIZEOF_CONST_TYPE, SIZEOF_MAIN_TYPE_NODE, SIZEOF_SUB_TYPE_NODE
-DIM SHARED SIZEOF_SUB_FUNC, SIZEOF_OBJECT, SIZEOF_TRAIT, SIZEOF_DECLARE_LIBRARY
-DIM SHARED SIZEOF_SOURCE_COPY
+DIM SHARED IS_UNSIGNED AS _UNSIGNED LONG
 
-SIZEOF_SOURCE_LINE = MEM_SIZEOF_MEM_STRING
-TYPE source_line
-  l AS MEM_String
+IS_UNSIGNED = &H0001
+
+TYPE type_info
+  typ    as LONG
+  flags  as long
+  udt_n  as long
+  length AS LONG
 END TYPE
 
-SIZEOF_CONST_TYPE = MEM_SIZEOF_MEM_STRING * 2
-TYPE const_type
-  nam   AS MEM_String
-  value AS MEM_String
-END TYPE
-
-SIZEOF_MAIN_TYPE_NODE = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_OFFSET + 4 + 4
-TYPE main_type_node
-  type_nam        AS MEM_String
-  first_type_node AS _OFFSET
-  members         AS LONG
-  full_size       AS LONG
-END TYPE
-
-SIZEOF_SUB_TYPE_NODE = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_OFFSET + 4 + 4
-TYPE sub_type_node
-  member_nam     AS MEM_String
-  next_node      AS _OFFSET
-  size           AS LONG
-  size_to_member AS LONG
-END TYPE
-
-SIZEOF_SUB_FUNC = 4 + MEM_SIZEOF_MEM_STRING + 4 + MEM_SIZEOF_MEM_STRING
-TYPE SUB_FUNC
-  subfunc AS LONG
-  nam     AS MEM_String
-  typ     AS LONG
-  source  AS MEM_String
-END TYPE
-
-SIZEOF_OBJECT = MEM_SIZEOF_MEM_STRING + 4 + MEM_SIZEOF_MEM_ARRAY + 4 + MEM_SIZEOF_MEM_ARRAY * 3
-TYPE OBJECT
-  nam      AS MEM_String
-  abstract AS LONG
-  traits   AS MEM_Array
-  inherit  AS LONG
-  flags    AS MEM_Array
-  public   AS MEM_Array
-  private  AS MEM_Array
-END TYPE
-
-SIZEOF_TRAIT = MEM_SIZEOF_MEM_STRING 
-TYPE trait
+TYPE udt_leaf
+  typ as type_info
   nam as MEM_String
 END TYPE
 
-SIZEOF_DECLARE_LIBRARY = MEM_SIZEOF_MEM_STRING + MEM_SIZEOF_ME:wM_ARRAY
-TYPE declare_library
-  lib       AS MEM_String
-  sub_funcs AS MEM_Array
+TYPE udt_base
+  nam         as MEM_String
+  leaf_count  as long
+  leafs       as _OFFSET
+  size        as long
 END TYPE
 
-SIZEOF_SOURCE_COPY = MEM_SIZEOF_MEM_ARRAY * 8
-TYPE SOURCE_copy
-  consts      AS MEM_Array 'Array of const_type
-  main_source AS MEM_Array 'Array of source_line
-  types       AS MEM_Array 'Array of main_type_node
-  SUB_func    AS MEM_Array 'Array of SUB_FUNC
-  Objects     AS MEM_Array 'Array of OBJECT
-  Traits      AS MEM_Array 'Array of TRAIT
-  libs        AS MEM_Array 'Array of declare_library
-  header      AS MEM_Array 'Array of MEM_Strings
-END TYPE
+REDIM SHARED udt_list(100) as udt_base, udt_count as long
 
-TYPE statement
+'$include:'ast.bi'
+'$include:'entry.bi'
 
-END TYPE
+'$include:'in/qb64/lang.bi'
+'$include:'out/qb64/lang.bi'
+'$include:'out/cpp/lang.bi'
 
-TYPE statement_node
-  statement_type AS LONG
-  leafs as _OFFSET
-END TYPE
 
 

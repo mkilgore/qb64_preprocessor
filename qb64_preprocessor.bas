@@ -21,10 +21,12 @@ END DECLARE
 DIM SHARED SOURCE_FILE$, SOURCE_DIRECTORY$
 DIM SHARED QB64_DIRECTORY$
 DIM SHARED OUTPUT_FILE$, OUTPUT_DIRECTORY$
-DIM SHARED OS_SLASH$, OS AS LONG
+DIM SHARED OS_SLASH$, OS AS LONG, OS_BITS AS LONG
 CONST LNX = 1
 CONST WIN = 2
 CONST MAC = 3
+CONST BIT_64 = 1
+CONST BIT_32 = 2
 
 DIM SHARED error_hand
 
@@ -50,12 +52,12 @@ CHDIR QB64_DIRECTORY$
 for x = 1 to source.length
   n$ = MEM_get_Str_array$(source, x)
   n$ = replace_with_case$(n$, "@PROC", "_OFFSET")
-
-
   MEM_put_str_array source, x, n$
 next x
 
-'load_source source, orig_source
+parse_init_parser
+
+parse_load_source source, orig_source
 
 'handle_objects orig_source
 
@@ -85,6 +87,11 @@ SUB init (c$, src AS SOURCE_Copy)
     OS_slash$ = "/"
     OS = LNX
   END IF
+  if instr(_os$, "[32BIT]") then
+    os_bits = bit_32
+  else
+    os_bits = bit_64
+  end if
   'debug_output "Getting directory"
   QB64_DIRECTORY$ = SPACE$(1024)
   getcwd QB64_DIRECTORY$, LEN(QB64_DIRECTORY$)
@@ -109,6 +116,8 @@ END SUB
 FUNCTION file_selection_GUI$ ()
   INPUT "Source code file to preprocess:"; fil$
   file_selection_GUI$ = fil$
+
+
 END FUNCTION
 
 ' General purpose functions
