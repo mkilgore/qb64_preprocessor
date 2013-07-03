@@ -1,0 +1,259 @@
+
+
+'Implements a slightly modified shuting-yard algorithm
+'IF flag simply marks if 
+FUNCTION pre_evaluate_expression$ (expression$)
+  static setup
+  if setup = 0 then: pre_setup_op_table: setup = -1
+
+  op_stack$ = ""
+  eval_stack$ = ""
+  e$ = expression$
+  do while e$ > ""
+    last_tok$ = t$
+
+    t$ = pre_get_token$(e$)
+    found_flag = 0
+    num = 0
+    ut$ = ucase$(t$)
+    op_num = pre_get_op_num&(ut$)
+    if ut$ = "-" then
+      if pre_get_op_num&(last_tok$) > 0 or last_tok$ = "(" or last_tok$ = "" then
+        t$ = "_"
+        ut$ = "_"
+        op_num = pre_get_op_num&(t$)
+      end if
+    end if
+    if op_num > 0 then
+      if op_stack$ > "" then
+        do
+          op_flag = 0
+
+          prev_op$ = pre_stack_pop$(op_stack$)
+          prev_op_num = pre_get_op_num&(prev_op$)
+          if prev_op$ <> "(" and (pre_ops(prev_op_num).prec >= pre_ops(op_num).prec) then
+            t = pre_stack_push_op_to_eval(eval_stack$, prev_op_num)
+          else
+            pre_stack_push op_stack$, prev_op$
+            op_flag = -1
+          end if
+        loop until op_stack$ = "" or op_flag
+      end if
+      pre_stack_push op_stack$, ut$
+    else
+      select case left$(ut$, 1)
+        case "("
+          found_flag = -1
+          pre_stack_push op_stack$, "("
+
+        case ")"
+          found_flag = -1
+          do
+            v$ = pre_stack_pop$(op_stack$)
+            if v$ <> "(" then t = pre_stack_push_op_to_eval(eval_stack$, pre_get_op_num&(v$))
+          loop until v$ = "(" or op_stack$ = ""
+          if op_stack$ = "" and v$ <> "(" then debug_output "Invalid IF statement": exit function
+          if op_stack$ > "" then
+            last_op$ = pre_stack_pop$(op_stack$)
+            last_op_num = pre_get_op_num&(last_op$)
+            if pre_ops(last_op_num).func_flag then
+              t = pre_stack_push_op_to_eval(eval_stack$, last_op_num)
+            else
+              pre_stack_push op_stack$, last_op$
+            end if
+          end if
+        case "0" to "9", "&", "."
+          pre_stack_push eval_stack$, t$
+        case ","
+
+        case else
+          'Slightly hacky -- We replace a !!defined macro in the code
+          if instr(op_stack$, "DEFINED") then 
+            pre_stack_push eval_stack$, t$
+          else
+            v$ = pre_get_define_value_from_array(pre_define_list, t$)
+            e$ = v$ + e$ 'Note -- It's NOT pushed onto the stack, but put on to be tokenized
+            'If the define'd value looks something like "(2+5)" then that will be evaluated via processing the tokens
+            'Because of this, define's can be nested to contain eachother -- Recursive define's could happen, don't do that >.>
+          end if
+      
+      end select
+    end if 
+  loop
+
+  if then_exit = 0 and if_flag then pre_report_preprocessor_error "Expected THEN at end of IF"
+
+  do while op_stack$ > ""
+    t$ = pre_stack_pop$(op_stack$)
+    t = pre_stack_push_op_to_eval(eval_stack$, pre_get_op_num&(t$))
+  loop
+
+  pre_evaluate_expression$ = eval_stack$
+end function
+
+sub pre_stack_push (stack$, t$)
+  stack$ = t$ + chr$(0) + stack$
+end sub 
+
+'NOTE: returns -1 on success, else returns one of the following:
+' >1  -- Returns greater then '0' if eval_stack$ doesn't have enough tokens
+'        on it to evaluate the number. returned is equal to the number of tokens needed
+'     -- Reports an error if the operator doesn't have enough tokens on the stack
+function pre_stack_push_op_to_eval (eval_stack$, op as long)
+  redim poped_values$(10)
+  ops_needed = pre_ops(op).params
+  'debug_output "Ops: " + str$(ops_needed)
+  for x = 1 to ops_needed
+    poped_values$(x) = pre_stack_pop$(eval_stack$)
+    'debug_output "Poping value: " + poped_values$(x)
+    if eval_stack$ = "" and x < ops_needed then pre_stack_push_opp_to_eval = ops_needed - x: exit function
+  next x
+  v$ = pre_execute_op$(op, poped_values$())
+  if v$ > "" then
+    'debug_output "Evaluted: " + v$
+    pre_stack_push eval_stack$, v$
+  else
+    pre_report_preprocessor_error "Invalid IF statement" 
+  end if
+end function
+
+function pre_str_t$ (v)
+  pre_str_t$ = rtrim$(ltrim$(str$(v)))
+end function
+
+function pre_stack_pop$ (stack$) 
+  if instr(stack$, chr$(0)) then
+    pre_stack_pop$ = mid$(stack$, 1, instr(stack$, chr$(0)) - 1)
+    stack$ = mid$(stack$, instr(stack$, chr$(0)) + 1)
+  else
+    pre_stack_pop$ = stack$
+    stack$ = ""
+  end if
+end function
+
+'Returns the number in pre_ops() that the operater is
+'Else returns -1 if the op isn't in the list
+function pre_get_op_num& (op$)
+  o$ = ucase$(op$)
+  for x = 1 to pre_op_count
+    if mem_get_Str$(pre_ops(x).nam) = o$ then
+      pre_get_op_num& = x
+      exit function
+    end if
+  next x
+  pre_get_op_num& = -1
+end function
+
+sub pre_setup_op_table ()
+  dim o as pre_operator
+  o.params = 1: o.assoc = 0: o.prec = 6: o.leave_text = 0: o.func_flag = 0:
+  pre_add_new_op "NOT"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.leave_text = -1: o.func_flag = -1
+  pre_add_new_op "DEFINED", o : clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 8
+  pre_add_new_op "+"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 10
+  pre_add_new_op "-"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 10
+  pre_add_new_op "*"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 10
+  pre_add_new_op "/"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 10
+  pre_add_new_op "\"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 12
+  pre_add_new_op "^"      , o: clear_op o
+  o.params = 2: o.assoc = -2: o.prec = 9
+  pre_add_new_op "MOD"    , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 5
+  pre_add_new_op "AND"    , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 4
+  pre_add_new_op "OR"     , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 3
+  pre_add_new_op "XOR"    , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 1
+  pre_add_new_op "IMP"    , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 2
+  pre_add_new_op "EQV"    , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op "="      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op "<>"     , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op ">"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op "<"      , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op ">="     , o: clear_op o
+  o.params = 2: o.assoc = -1: o.prec = 7
+  pre_add_new_op "<="     , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 11
+  pre_add_new_op "_"      , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "SIN"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "COS"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "TAN"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "ATN"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "EXP"    , o: clear_op o
+  o.params = 1: o.assoc = 0: o.prec = 13: o.func_flag = -1
+  pre_add_new_op "LOG"    , o: clear_op o
+
+end sub
+
+sub clear_op (o as pre_operator)
+  o.func = 0
+  o.params = 0
+  o.assoc = 0
+  o.prec = 0
+  o.leave_text = 0
+  o.func_flag = 0
+end sub
+
+function pre_execute_op$ (func as long, poped_values$())
+  c = 0
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(NOT val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(pre_file_wide_define_exists(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) +   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) -   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) *   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) /   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) \   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) ^   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) mod val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) AND val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) or  val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) xor val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) imp val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) eqv val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) =   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) <>  val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) >   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) <   val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) >=  val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(val(poped_values$(2)) <=  val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(-val(poped_values$(1))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(sin(val(poped_values$(1)))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(cos(val(poped_values$(1)))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(tan(val(poped_values$(1)))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(atn(val(poped_values$(1)))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(exp(val(poped_values$(1)))): exit function
+  c = c + 1: if func = c then pre_execute_op$ = pre_str_t$(log(val(poped_values$(1)))): exit function
+end function
+
+sub pre_add_new_op (nam$, o as pre_operator)
+  static func
+  func = func + 1
+  pre_op_count = pre_op_count + 1
+
+  if pre_op_count > ubound(pre_ops) then
+    redim _preserve pre_ops(ubound(pre_ops) + 10) as pre_operator
+  end if
+  pre_ops(pre_op_count) = o
+
+  MEM_put_str pre_ops(pre_op_count).nam, nam$ 
+
+end sub
+

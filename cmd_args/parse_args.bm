@@ -1,0 +1,79 @@
+
+function arg_reg& (a as arg_argtype)
+  arg_nextreg = arg_nextreg + 1
+  if ubound(arg_list) <= arg_nextreg then
+    REDIM _PRESERVE arg_list(ubound(arg_list) + 100) AS arg_argtype
+  end if
+  MEM_put_str arg_list(arg_nextarg).lng, MEM_get_str$(a.lng)
+  arg_list(arg_nextarg).short = a.short
+  arg_list(arg_nextarg).param_type = a.param_type
+end function
+
+'Doesn't free the 'lng' -- The string's contents
+'Are copied when we register an arg anyway
+'param_value is assumed to be blank -- Since it should be
+sub arg_clear (a as arg_argtype)
+  a.short = space$(len(a.short))
+  a.param_type = 0
+end sub
+
+sub arg_clear_free (a as arg_argtype)
+  a.short = space$(len(a.short))
+  a.param_type = 0
+  MEM_free_string a.param_value
+  MEM_free_String a.lng
+end sub
+
+'Add in all functions to call...
+sub arg_register_arguments ()
+  dim a as arg_argtype
+  pre_register_cmd_options
+end sub
+
+sub arg_parse_arguments (cmd$)
+  cmdt$ = ltrim$(rtrim$(cmd$))
+  not_proc$ = ""
+  dim l as long
+  l = len(c$)
+  in_single_flags = 0
+  x = 1
+  processed = 0
+  do
+    c$ = mid$(cmdt$, x, 1)
+    if c$ = "-" then
+      if in_single_flags then
+        print "Error: not expecting '-' at character:"; x
+        system
+      else
+        in_single_flags = -1
+      end if
+    elseif c$ = " " then
+      in_single_flags = 0
+    end if
+
+    if in_single_flags then
+      for k = 1 to arg_nextarg
+        if arg_list(k).short = c$ then
+          arg_list(k).param_is_set = -1
+          if arg_list(k).param_type <> 0 then
+
+          end if
+          exit for
+        end if
+      next k
+    end if
+    x = x + 1
+  loop while x <= l
+  exit sub
+
+get_num:
+
+return
+
+get_string:
+
+return
+
+end sub
+
+

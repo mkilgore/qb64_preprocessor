@@ -1,0 +1,93 @@
+
+' Define Array
+
+SUB pre_new_define (a as MEM_Array, d$, v$)
+$CHECKING:OFF
+if pre_change_define_in_array(a, d$, v$) = 0 then
+  pre_add_define_to_array a, d$, v$
+end if
+$CHECKING:ON
+END SUB
+
+SUB pre_add_define_to_array (a as MEM_Array, s$, v$)
+DIM d as pre_define
+if a.length = 0 then a.element_size = SIZEOF_pre_DEFINE
+MEM_increment_array a
+MEM_put_str d.nam, s$
+MEM_put_str d.value, v$
+$CHECKING:OFF
+_MEMPUT MEM_FAKEMEM, a.mem + a.last_element * a.element_size, d
+$CHECKING:ON
+END SUB
+
+function pre_file_wide_define_exists (de$)
+pre_file_wide_define_exists = pre_define_exists(pre_define_list, de$)
+end function
+
+function pre_define_exists (a as MEM_Array, de$)
+$CHECKING:OFF
+DIM d as pre_define
+for x = 1 to a.last_element
+  d = _memget(mem_fakemem, a.mem + x * a.element_size, pre_define)
+  if mem_get_str$(d.nam) = de$ then
+    pre_define_exists = -1
+    exit function
+  end if
+next x
+$CHECKING:ON
+end function
+
+FUNCTION pre_change_define_in_array (a as MEM_Array, old$, new$)
+$CHECKING:OFF
+DIM d as pre_define
+FOR x = 1 to a.last_element
+  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, pre_define)
+  if MEM_get_Str$(d.nam) = old$ then
+    MEM_put_str d.value, new$
+    _MEMPUT MEM_FAKEMEM, a.mem + x * a.element_Size, d
+    pre_change_define_in_array = -1
+    exit sub
+  end if
+NEXT x
+$CHECKING:ON
+END FUNCTION 
+
+SUB pre_remove_define_from_array (a as MEM_Array, d$)
+$CHECKING:OFF
+DIM d as pre_define
+FOR x = 1 to a.last_element
+  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, pre_define)
+  if MEM_get_Str$(d.nam) = d$ then
+    MEM_put_str d.nam, ""
+    _MEMPUT MEM_FAKEMEM, a.mem + x * a.element_Size, d
+    exit sub
+  end if
+NEXT x
+$CHECKING:ON
+END SUB
+
+FUNCTION pre_get_define_value_from_array$ (a as MEM_Array, d$)
+$CHECKING:OFF
+DIM d as pre_define
+FOR x = 1 to a.last_element
+  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, pre_define)
+  if MEM_get_Str$(d.nam) = d$ then
+    pre_get_define_value_from_array$ = MEM_get_Str$(d.value)
+    exit sub
+  end if
+NEXT x
+$CHECKING:ON
+END FUNCTION
+
+SUB pre_free_define_array (a as MEM_Array)
+DIM d as pre_define
+FOR x = 1 to a.last_element
+  $CHECKING:OFF
+  d = _MEMGET(MEM_FAKEMEM, a.mem + x * a.element_size, pre_define)
+  MEM_free_string d.nam
+  MEM_free_string d.value
+  $CHECKING:ON
+NEXT x
+MEM_free_array a
+END SUB
+

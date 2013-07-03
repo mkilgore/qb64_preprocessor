@@ -1,10 +1,51 @@
 
-SUB init_source (src AS SOURCE_copy)
+SUB parse_init_parser ()
+
+'$include:'cmds.bm'
 
 END SUB
 
-SUB load_source (source AS MEM_Array, src AS SOURCE_copy)
+SUB parse_init_source (src AS SOURCE_copy)
 
 END SUB
+
+SUB parse_load_source (source AS MEM_Array, src AS SOURCE_copy)
+
+END SUB
+
+SUB parse_reg_command (s as parse_statement_entry)
+  parse_command_count = parse_command_count + 1
+  if parse_command_count >= ubound(parse_Commands) then
+    redim parse_commands(ubound(parse_commands) + 100) as parse_statement_entry
+  end if
+
+  parse_commands(parse_command_count).node_size = s.node_size
+  parse_commands(parse_command_count).cmd_type = s.cmd_type
+  MEM_put_str parse_commands(parse_command_count).ident, MEM_get_str$(s.ident)
+  MEM_put_str parse_commands(parse_command_count).params, MEM_get_str$(s.params)
+  MEM_put_Str parse_commands(parse_command_count).format, MEM_get_str$(s.format)
+END SUB
+
+SUB parse_clear_command (s as parse_statement_entry)
+  s.node_size = 0
+  s.cmd_type = 0
+  MEM_put_str s.ident, ""
+  MEM_put_str s.params, ""
+  MEM_put_Str s.format, ""
+end sub
+
+SUB parse_add_offset_to_array (a as MEM_Array, o as _OFFSET)
+  IF a.length = 0 then a.element_size = LEN(o)
+  MEM_increment_array a
+  _MEMPUT MEM_FAKEMEM, a.mem + a.last_element * a.element_size, o
+END SUB
+
+
+'$include:'ast.bm'
+'$include:'entry.bm'
+
+'$include:'in/qb64/lang.bm'
+'$include:'out/qb64/lang.bm'
+'$include:'out/cpp/lang.bm'
 
 
