@@ -117,8 +117,8 @@ function pre_stack_push_op_to_eval (eval_stack$, op as long)
   end if
 end function
 
-function pre_str_t$ (v)
-  pre_str_t$ = rtrim$(ltrim$(str$(v)))
+function pre_str_t$ (v##)
+  pre_str_t$ = rtrim$(ltrim$(str$(v##)))
 end function
 
 function pre_stack_pop$ (stack$) 
