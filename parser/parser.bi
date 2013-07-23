@@ -15,8 +15,10 @@ SPECIAL_TYPE   = &H0400
 UDT_TYPE       = &H0800
 
 DIM SHARED IS_UNSIGNED AS _UNSIGNED LONG
-
 IS_UNSIGNED = &H0001
+
+DIM SHARED IS_NUMERAL AS _UNSIGNED LONG
+IS_NUMERAL = BYTE_TYPE OR INTEGER_TYPE OR LONG_TYPE OR SINGLE_TYPE OR DOUBLE_TYPE OR INTEGER64_TYPE OR FLOAT_TYPE
 
 TYPE type_info
   typ    as LONG
@@ -45,6 +47,5 @@ REDIM SHARED udt_list(100) as udt_base, udt_count as long
 '$include:'in/qb64/lang.bi'
 '$include:'out/qb64/lang.bi'
 '$include:'out/cpp/lang.bi'
-
 
 

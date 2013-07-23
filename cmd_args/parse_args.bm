@@ -17,9 +17,9 @@ sub arg_clear (a as arg_argtype)
   a.param_type = 0
 end sub
 
+'Clears and frees everything
 sub arg_clear_free (a as arg_argtype)
-  a.short = space$(len(a.short))
-  a.param_type = 0
+  arg_clear a
   MEM_free_string a.param_value
   MEM_free_String a.lng
 end sub
@@ -55,9 +55,17 @@ sub arg_parse_arguments (cmd$)
       for k = 1 to arg_nextarg
         if arg_list(k).short = c$ then
           arg_list(k).param_is_set = -1
-          if arg_list(k).param_type <> 0 then
+          select case arg_list(k).param_type
+            CASE ARG_PARAM_TYPE_NUM
+              MEM_put_Str arg_list(k).param_value, arg_get_num$(mid$(cmdt$, x + 1, 1))
 
-          end if
+            CASE ARG_PARAM_TYPE_STRING
+              MEM_put_str arg_list(k).param_value, arg_get_string$(mid$(cmdt$, x + 1, 1))
+            
+            CASE ARG_PARAM_TYPE_INTEGER
+              MEM_put_str arg_list(k).param_value, arg_get_integer$(mid$(cmdt$, x + 1, 1))
+
+          end select
           exit for
         end if
       next k
@@ -65,15 +73,19 @@ sub arg_parse_arguments (cmd$)
     x = x + 1
   loop while x <= l
   exit sub
-
-get_num:
-
-return
-
-get_string:
-
-return
-
 end sub
 
+function arg_get_num$ (s$)
+
+end function
+
+function arg_get_integer$ (s$)
+
+end function
+
+function arg_get_string$ (s$)
+if left$(ltrim$(s$), 1) = chr$(34) THEN
+  s$ = ltrim$(s$)
+END IF
+end function
 
